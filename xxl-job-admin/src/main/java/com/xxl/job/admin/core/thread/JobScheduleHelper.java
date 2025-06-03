@@ -40,7 +40,7 @@ public class JobScheduleHelper {
         scheduleThread = new Thread(new Runnable() {
             @Override
             public void run() {
-
+                //整秒执行
                 try {
                     TimeUnit.MILLISECONDS.sleep(5000 - System.currentTimeMillis()%1000 );
                 } catch (Throwable e) {

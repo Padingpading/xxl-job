@@ -15,7 +15,13 @@ public enum ExecutorRouteStrategyEnum {
     CONSISTENT_HASH(I18nUtil.getString("jobconf_route_consistenthash"), new ExecutorRouteConsistentHash()),
     LEAST_FREQUENTLY_USED(I18nUtil.getString("jobconf_route_lfu"), new ExecutorRouteLFU()),
     LEAST_RECENTLY_USED(I18nUtil.getString("jobconf_route_lru"), new ExecutorRouteLRU()),
+    /**
+     * 故障转移
+     */
     FAILOVER(I18nUtil.getString("jobconf_route_failover"), new ExecutorRouteFailover()),
+    /**
+     * 忙碌转移
+     */
     BUSYOVER(I18nUtil.getString("jobconf_route_busyover"), new ExecutorRouteBusyover()),
     SHARDING_BROADCAST(I18nUtil.getString("jobconf_route_shard"), null);
 

@@ -14,6 +14,7 @@ import javax.sql.DataSource;
 import java.util.Arrays;
 
 /**
+ * 后台配置
  * xxl-job config
  *
  * @author xuxueli 2017-04-28
@@ -48,7 +49,9 @@ public class XxlJobAdminConfig implements InitializingBean, DisposableBean {
 
     // ---------------------- XxlJobScheduler ----------------------
 
-    // conf
+    /**
+     * 语言
+     */
     @Value("${xxl.job.i18n}")
     private String i18n;
 

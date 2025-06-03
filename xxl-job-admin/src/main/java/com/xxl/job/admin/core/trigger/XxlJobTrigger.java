@@ -48,7 +48,12 @@ public class XxlJobTrigger {
                                String executorParam,
                                String addressList) {
 
-        // load data
+        // 根据job id 从 xxl_job_info 获取job
+        /**
+         * SELECT <include refid="Base_Column_List" />
+         FROM xxl_job_info AS t
+         WHERE t.id = #{id}
+         **/
         XxlJobInfo jobInfo = XxlJobAdminConfig.getAdminConfig().getXxlJobInfoDao().loadById(jobId);
         if (jobInfo == null) {
             logger.warn(">>>>>>>>>>>> trigger fail, jobId invalid，jobId={}", jobId);
@@ -57,16 +62,29 @@ public class XxlJobTrigger {
         if (executorParam != null) {
             jobInfo.setExecutorParam(executorParam);
         }
+        // 改任务设置的 任务执行失败次数，如果到时间正常触发 则failRetryCount 为-1 ；
+        // 如果是失败的补充，则为改任务剩余补偿次数
+        // 到时间第一次触发任务 则获取xxl_job_info  executor_fail_retry_count 设置的重试次数
         int finalFailRetryCount = failRetryCount>=0?failRetryCount:jobInfo.getExecutorFailRetryCount();
         XxlJobGroup group = XxlJobAdminConfig.getAdminConfig().getXxlJobGroupDao().load(jobInfo.getJobGroup());
 
         // cover addressList
+        // 获取改任务对应的执行器信息
+        /**
+         *SELECT <include refid="Base_Column_List" />
+         FROM xxl_job_group AS t
+         WHERE t.id = #{id}
+         **/
+        // cover addressList
+        // 执行器地址覆盖，如果重新传入了执行器地址 则进行覆盖；否则取 XxlJobGroup  的执行器地址
         if (addressList!=null && addressList.trim().length()>0) {
             group.setAddressType(1);
             group.setAddressList(addressList.trim());
         }
 
         // sharding param
+        // sharding param
+        // 执行器任务分片参数 格式如 1/2
         int[] shardingParam = null;
         if (executorShardingParam!=null){
             String[] shardingArr = executorShardingParam.split("/");
@@ -76,9 +94,11 @@ public class XxlJobTrigger {
                 shardingParam[1] = Integer.valueOf(shardingArr[1]);
             }
         }
+        // 判断路由策略
         if (ExecutorRouteStrategyEnum.SHARDING_BROADCAST==ExecutorRouteStrategyEnum.match(jobInfo.getExecutorRouteStrategy(), null)
                 && group.getRegistryList()!=null && !group.getRegistryList().isEmpty()
                 && shardingParam==null) {
+            // 如果是： 分片广播，则需要为注册的每个执行器都 发送任务
             for (int i = 0; i < group.getRegistryList().size(); i++) {
                 processTrigger(group, jobInfo, finalFailRetryCount, triggerType, i, group.getRegistryList().size());
             }
@@ -86,6 +106,7 @@ public class XxlJobTrigger {
             if (shardingParam == null) {
                 shardingParam = new int[]{0, 1};
             }
+            // 非分片广播 ，则直接执行任务
             processTrigger(group, jobInfo, finalFailRetryCount, triggerType, shardingParam[0], shardingParam[1]);
         }
 
@@ -109,13 +130,16 @@ public class XxlJobTrigger {
      * @param total                     sharding index
      */
     private static void processTrigger(XxlJobGroup group, XxlJobInfo jobInfo, int finalFailRetryCount, TriggerTypeEnum triggerType, int index, int total){
-
+        // param
+        // 获取阻塞处理策略 ，如果从任务中的 阻塞处理策略 不在ExecutorBlockStrategyEnum 枚举中，则默认为 单机率行
+        // "SERIAL EXECUTION":单机率行; "DISCARD LATER":云弃后续调度;"COVER EARLY":獲盖之前调度
         // param
         ExecutorBlockStrategyEnum blockStrategy = ExecutorBlockStrategyEnum.match(jobInfo.getExecutorBlockStrategy(), ExecutorBlockStrategyEnum.SERIAL_EXECUTION);  // block strategy
         ExecutorRouteStrategyEnum executorRouteStrategyEnum = ExecutorRouteStrategyEnum.match(jobInfo.getExecutorRouteStrategy(), null);    // route strategy
         String shardingParam = (ExecutorRouteStrategyEnum.SHARDING_BROADCAST==executorRouteStrategyEnum)?String.valueOf(index).concat("/").concat(String.valueOf(total)):null;
 
-        // 1、save log-id
+        //1、save log-id
+        //save log-id 记录log 日志
         XxlJobLog jobLog = new XxlJobLog();
         jobLog.setJobGroup(jobInfo.getJobGroup());
         jobLog.setJobId(jobInfo.getId());
@@ -123,7 +147,7 @@ public class XxlJobTrigger {
         XxlJobAdminConfig.getAdminConfig().getXxlJobLogDao().save(jobLog);
         logger.debug(">>>>>>>>>>> xxl-job trigger start, jobId:{}", jobLog.getId());
 
-        // 2、init trigger-param
+        // 2、init trigger-param创建任务执行器的 triggerParam 对象
         TriggerParam triggerParam = new TriggerParam();
         triggerParam.setJobId(jobInfo.getId());
         triggerParam.setExecutorHandler(jobInfo.getExecutorHandler());
@@ -149,6 +173,7 @@ public class XxlJobTrigger {
                     address = group.getRegistryList().get(0);
                 }
             } else {
+                //路由策略
                 routeAddressResult = executorRouteStrategyEnum.getRouter().route(triggerParam, group.getRegistryList());
                 if (routeAddressResult.getCode() == ReturnT.SUCCESS_CODE) {
                     address = routeAddressResult.getContent();

@@ -21,7 +21,7 @@ public class XxlJobScheduler  {
 
 
     public void init() throws Exception {
-        // init i18n
+        // init i18n 设置语言
         initI18n();
 
         // admin trigger pool start
